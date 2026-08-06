@@ -1,0 +1,11 @@
+.vscode/
+.wrangler/
+node_modules/
+
+public/pkg/*.wasm
+public/pkg/*.js
+
+bun.lock
+
+AGENTS.md
+CLAUDE.md
