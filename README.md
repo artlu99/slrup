@@ -39,7 +39,7 @@ cp package/anydoc_wasm.js package/anydoc_wasm_bg.wasm /path/to/slrup/public/pkg/
 Replace `/path/to/slrup` with this repo’s absolute path. To pin a version:
 
 ```bash
-npm pack @firecrawl/anydoc-wasm@0.1.6
+npm pack @firecrawl/anydoc-wasm@0.1.7
 ```
 
 ### Option B — build from the anydoc source
