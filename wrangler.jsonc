@@ -3,7 +3,7 @@
 	"name": "slrup",
 	"compatibility_date": "2026-08-06",
 	"assets": { "directory": "./public" },
-	"observability": { "enabled": true },
+	"observability": { "enabled": false },
 	"upload_source_maps": true,
 	"compatibility_flags": ["nodejs_compat"]
 }

@@ -577,9 +577,24 @@
             <strong>files never leave your machine</strong>.
           </p>
           <ul class="badges">
-           <li>
+            <li>
               <a href="https://github.com/artlu99/slrup/blob/main/LICENSE">
                 <span class="key">license</span><span class="value">MIT</span>
+              </a>
+            </li>
+            <li>
+              <a href="https://github.com/artlu99/slrup/blob/main/PRIVACY.md">
+                <span class="key">scope</span><span class="value">local</span>
+              </a>
+            </li>
+            <li>
+              <a href="https://github.com/artlu99/slrup/blob/main/PRIVACY.md">
+                <span class="key">tracking</span><span class="value">none</span>
+              </a>
+            </li>
+            <li>
+              <a href="https://github.com/artlu99/slrup/blob/main/PRIVACY.md">
+                <span class="key">offline</span><span class="value">yes</span>
               </a>
             </li>
           </ul>
@@ -621,6 +636,25 @@
       </footer>
     </div>
 
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').then((reg) => {
+            reg.addEventListener('updatefound', () => {
+              const newWorker = reg.installing;
+              newWorker?.addEventListener('statechange', () => {
+                if (
+                  newWorker.state === 'activated' &&
+                  navigator.serviceWorker.controller
+                ) {
+                  window.location.reload();
+                }
+              });
+            });
+          });
+        });
+      }
+    </script>
     <script type="module">
       import init, {
         formatFromBytes,
