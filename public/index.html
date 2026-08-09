@@ -636,6 +636,19 @@
       let markdown = '';
       let baseName = 'document';
 
+      const ERROR_HINTS = {
+        encrypted:
+          'This file is password-protected. Remove the password and try again.',
+        unsupported:
+          "This format isn't supported, or the file is an image-only PDF.",
+        malformed:
+          'The file is structurally unusable; nothing could be extracted.',
+        resourceLimit:
+          'The file crossed a safety limit (decompression, nesting, or node count). Try a smaller file.',
+        missingPart:
+          'A part required for any meaningful output is missing from the file.',
+      };
+
       function showResult(name, format, stats, text, isError) {
         $('result').hidden = false;
         $('result-name').textContent = name;
@@ -664,11 +677,13 @@
             false,
           );
         } catch (error) {
+          const detail = error?.message ?? String(error);
+          const hint = ERROR_HINTS[error?.code];
           showResult(
             name,
             format,
             '',
-            `Could not convert this file: ${error.message ?? error}`,
+            hint ? `${hint}\n\n${detail}` : `Could not convert this file: ${detail}`,
             true,
           );
         }
