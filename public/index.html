@@ -332,6 +332,10 @@
         border-color: var(--heat);
         color: var(--heat);
       }
+      .samples button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
 
       .result[hidden] {
         display: none;
@@ -610,6 +614,11 @@
             >
           </button>
           <input type="file" id="file" hidden />
+          <p class="samples">
+            or
+            <button type="button" id="paste-url">paste a PDF URL</button>
+            from your clipboard
+          </p>
         </section>
 
         <section class="band result" id="result" hidden aria-live="polite">
@@ -686,10 +695,10 @@
       function showResult(name, format, stats, text, isError) {
         $('result').hidden = false;
         $('result-name').textContent = name;
-        $('result-arrow').hidden = isError;
-        $('result-stats').textContent = isError ? '' : `${format} · ${stats}`;
-        $('copy').hidden = isError;
-        $('download').hidden = isError;
+        $('result-arrow').hidden = isError || !format;
+        $('result-stats').textContent = [format, stats].filter(Boolean).join(' · ');
+        $('copy').hidden = isError || !stats;
+        $('download').hidden = isError || !stats;
         output.textContent = text;
         output.classList.toggle('error', isError);
         $('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -743,6 +752,139 @@
         drop.classList.remove('over');
         const dropped = event.dataTransfer?.files?.[0];
         if (dropped) convertFile(dropped);
+      });
+
+      const pasteUrl = $('paste-url');
+      const MAX_PDF_BYTES = 100 * 1024 * 1024;
+      const FETCH_TIMEOUT_MS = 30_000;
+
+      async function fetchPdf(href, controller) {
+        const response = await fetch(href, {
+          redirect: 'follow',
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          throw new Error(
+            `HTTP ${response.status} ${response.statusText}`.trimEnd(),
+          );
+        }
+        const type = response.headers.get('content-type') ?? 'unknown type';
+        if (!response.body) {
+          const declared = Number(response.headers.get('content-length'));
+          if (declared > MAX_PDF_BYTES) {
+            throw new Error(
+              `The download exceeded the ${Math.round(MAX_PDF_BYTES / 1024 / 1024)} MB limit.`,
+            );
+          }
+          return { bytes: new Uint8Array(await response.arrayBuffer()), type };
+        }
+        const reader = response.body.getReader();
+        const chunks = [];
+        let total = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          total += value.byteLength;
+          if (total > MAX_PDF_BYTES) {
+            controller.abort();
+            throw new Error(
+              `The download exceeded the ${Math.round(MAX_PDF_BYTES / 1024 / 1024)} MB limit.`,
+            );
+          }
+          chunks.push(value);
+        }
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+          bytes.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        return { bytes, type };
+      }
+
+      async function convertUrl(raw) {
+        pasteUrl.disabled = true;
+        try {
+          let url;
+          try {
+            url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`);
+          } catch {
+            showResult('URL', '', '', 'Clipboard did not contain a URL.', true);
+            return;
+          }
+          if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+            showResult(
+              url.href,
+              '',
+              '',
+              `Only http(s) URLs are supported, got ${url.protocol}.`,
+              true,
+            );
+            return;
+          }
+          if (
+            location.protocol === 'https:' &&
+            url.protocol === 'http:' &&
+            !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(url.hostname)
+          ) {
+            showResult(
+              url.href,
+              '',
+              '',
+              'This https page cannot fetch http:// URLs (mixed content). Use an https link, or download the file and drop it here.',
+              true,
+            );
+            return;
+          }
+          const segment = url.pathname.split('/').filter(Boolean).pop() ?? '';
+          let name;
+          try {
+            name = decodeURIComponent(segment);
+          } catch {
+            name = segment;
+          }
+          if (!name) name = url.hostname;
+          if (name.length > 80) name = name.slice(0, 80);
+          showResult(name, '', '', `Fetching ${url.href} …`, false);
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+          try {
+            const { bytes, type } = await fetchPdf(url.href, controller);
+            if (new TextDecoder().decode(bytes.subarray(0, 5)) !== '%PDF-') {
+              throw new Error(
+                `The URL did not return a PDF (${type}). Download it and drop the file here instead.`,
+              );
+            }
+            convert(name, bytes);
+          } catch (error) {
+            let reason;
+            if (error?.name === 'AbortError') {
+              reason = `Timed out after ${FETCH_TIMEOUT_MS / 1000}s.`;
+            } else if (error instanceof TypeError) {
+              reason =
+                'Blocked by the browser (CORS) or unreachable. Download the file and drop it here.';
+            } else {
+              reason = error?.message ?? String(error);
+            }
+            showResult(name, '', '', `Could not fetch ${url.href}\n\n${reason}`, true);
+          } finally {
+            clearTimeout(timer);
+          }
+        } finally {
+          pasteUrl.disabled = false;
+        }
+      }
+
+      pasteUrl.addEventListener('click', async () => {
+        pasteUrl.disabled = true;
+        let text = '';
+        try {
+          text = (await navigator.clipboard.readText()).trim();
+        } catch {
+          text = (window.prompt('Paste a PDF URL') ?? '').trim();
+        }
+        if (text) await convertUrl(text);
+        else pasteUrl.disabled = false;
       });
 
       $('copy').addEventListener('click', async () => {

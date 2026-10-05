@@ -1,7 +1,7 @@
 // slrup service worker — caches the app shell for offline use.
 // See PRIVACY.md "How to verify" for the offline claim.
 
-const CACHE = 'slrup-v1';
+const CACHE = 'slrup-v5';
 const ASSETS = [
   './',
   './index.html',
